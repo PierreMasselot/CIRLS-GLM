@@ -85,11 +85,11 @@ logaggcomp <- log(aggcomp)
 #----- Full composition
 
 # Constraint matrix
-compCmat <- t(rep(1, ncol(logcomp)))
+# compCmat <- t(rep(1, ncol(logcomp)))
 
 # Fit model
 compfit <- glm(y ~ logcomp, family = "binomial", method = "cirls.fit", 
-  control = list(maxit = 50, Cmat = list(logcomp = compCmat)))
+  maxit = 50, constr = ~ zerosum(logcomp))
 
 # Confidence intervals
 compci <- confint(compfit)
@@ -102,7 +102,7 @@ compci <- confint(compfit)
 # for (i in seq_along(genlist)) multiCmat[i, which(speciesinfo[,1] == genlist[i])] <- 1
 # 
 # # Fit model
-# multifit <- glm(y ~ logcomp, family = "binomial", method = "cirls.fit", 
+# multifit <- glm(y ~ logcomp, family = "binomial", method = "cirls.fit",
 #   control = list(maxit = 50, Cmat = list(logcomp = multiCmat)))
 # 
 # # Confidence intervals
@@ -115,7 +115,7 @@ aggCmat <- t(rep(1, ncol(logaggcomp)))
 
 # Fit model
 aggfit <- glm(y ~ logaggcomp, family = "binomial", method = "cirls.fit",
-  control = list(maxit = 50, Cmat = list(logaggcomp = aggCmat)))
+  maxit = 50, constr = ~ zerosum(logaggcomp))
 
 # Confidence intervals
 aggci <- confint(aggfit)

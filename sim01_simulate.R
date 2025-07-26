@@ -5,83 +5,167 @@
 ################################################################################
 
 # List of packages
-packages <- c("MASS", "foreach", "ggplot2", "rngtools", "dplyr", "doParallel", 
-  "devtools", "scico", "patchwork")
+packages <- c("tidyverse", "MASS", "foreach", "rngtools", "doFuture", 
+  "devtools", "scico", "patchwork", "iterators", "progressr", "scales",
+  "mixmeta")
 lapply(packages, library, character.only = T) |> invisible()
 
 # Dev version of cirls
-# cirlsdir <- "C:/Users/lshpm4/OneDrive - London School of Hygiene and Tropical Medicine/Research/Projects/CIRLS/Subprojects/cirls"
-cirlsdir <- "C:/Users/PierreMasselot/OneDrive - London School of Hygiene and Tropical Medicine/Research/Projects/CIRLS/Subprojects/cirls"
+cirlsdir <- "../../cirls"
 allfiles <- list.files(sprintf("%s/R", cirlsdir), full.names = T)
 lapply(allfiles, source) |> invisible()
+cirlsfct <- list.files(sprintf("%s/R", cirlsdir)) |> 
+  gsub(pattern = ".R", repl = "", fixed = TRUE)
+
+# EDF function test
+source("temp/edf2.r")
+source("temp/edfboot.r")
 
 #-------------------
-# Parameters
+# Parameters & scenarios
 #-------------------
 
-#----- Simulation parameters
+#----- General parameters
 
 # Number of simulations
-nsim <- 500
+nsim <- 1000
 
-# Number of observations
-ns <- c(500, 1000, 5000)
-
-# Error standard deviation
-sigmas <- 3
-
-#----- Data-generating mechanisms
-
-dgmlist <- list(
-  
-  # First scenario: very simple nonnegative regression
-  nonneg = list(
-    lab = "Non-negative regression",
-    datafun = function(n, p, sigma){
-      x <- mvrnorm(n, rep(0, p), diag(p))
-      beta <- rep(0.5, p + 1)
-      y <- rpois(n, exp(cbind(1, x) %*% beta))
-      list(x = x, y = y, beta = beta)
-    },
-    modfuns = list(
-      uncons = function(x, y) glm(y ~ x, family = "poisson"),
-      cons = function(x, y){
-        Cmat <- shapeConstr(x, shape = "pos")
-        glm(y ~ x, family = "poisson", method = "cirls.fit", 
-          Cmat = list(x = Cmat), lb = c(0.4, 0.5))
-      },
-      over = function(x, y){
-        Cmat <- shapeConstr(x, shape = "pos")
-        glm(y ~ x, family = "poisson", method = "cirls.fit", 
-          Cmat = list(x = Cmat), lb = c(0.5, 0.6))
-      }
-    )
-  ),
-  
-  # Second scenario, increasing strata means (Oliva-Avilès et al. 2019)
-  survey = list(
-    lab = "Non-decreasing strata",
-    datafun = function(n, p, sigma){
-      x <- factor(sample.int(p, n, replace = T))
-      beta <- plogis(seq(-p/2, p/2, length.out = p), scale = p/20) - .5
-      y <- rnorm(n, beta[x], sigma)
-      list(x = x, y = y, beta = beta)
-    },
-    modfuns = list(
-      uncons = function(x, y) glm(y ~ 0 + x),
-      cons = function(x, y){
-        Cmat <- diff(diag(nlevels(x)))
-        glm(y ~ 0 + x, method = "cirls.fit", Cmat = Cmat)
-      },
-      over = function(x, y){
-        p <- nlevels(x)
-        Cmat <- rbind(diff(diag(nlevels(x))), diag(nlevels(x)))
-        Cmat <- Cmat[-checkCmat(Cmat)$redundant,]
-        glm(y ~ 0 + x, method = "cirls.fit", Cmat = Cmat)
-      }
-    )
-  )
+# Common parameters
+parlist <- list(
+  n = c(500), # Sample size
+  s2 = c(50) # Noise level
 )
+
+# Initialise lists
+lablist <- dgmlist <- fitlist <- sclist <- list()
+
+#----- Data-generation mechanism 1: nonnegative regression
+
+# # Label for this mechanism
+# lablist[["nonneg"]] <- "Non-negative regression"
+# 
+# # Function to generate data: sample size, error (determines intercept), 
+# #     true coefficient (constrained and covariates)
+# dgmlist[["nonneg"]] <- function(n, s2, par, covar){
+#   beta <- c(par, covar)
+#   p <- length(beta)
+#   x <- mvrnorm(n, rep(0, p), diag(p))
+#   eta <- 5 + x %*% beta
+#   # y <- rpois(n, exp(eta))
+#   y <- rnorm(n, eta, sqrt(s2))
+#   list(x = x, y = y, beta = c(s2, beta))
+# }
+# 
+# # Function to fit model: response, predictors, number of non-neg constraints
+# fitlist[["nonneg"]] <- list(
+#   cirls = function(x, y){
+#     p <- ncol(x)
+#     Cmat <- cbind(0, diag(1), matrix(0, 1, p - 1))
+#     # glm(y ~ x, family = "poisson", method = "cirls.fit", Cmat = Cmat, lb = 0)
+#     glm(y ~ x, method = "cirls.fit", Cmat = Cmat, lb = 0)
+#   },
+#   glm = function(y, x){
+#     # glm(y ~ x, family = "poisson")
+#     glm(y ~ x)
+#   }
+# )
+# 
+# # Scenarios
+# sclist[["nonneg"]] <- list(par = c(-1, 0, 1), covar = 1, m = 1)
+
+#----- Data-generation mechanism 1b: nonnegative regression correlated variables
+
+# Label for this mechanism
+lablist[["nonneg_cor"]] <- "Non-negative regression"
+
+# Function to generate data: sample size, error (determines intercept), 
+#     true coefficient (constrained and covariates)
+dgmlist[["nonneg_cor"]] <- function(n, s2, par, covar){
+  beta <- c(par, covar)
+  p <- length(beta)
+  x <- mvrnorm(n, rep(0, p), xpndMat(c(1, .5, 1)))
+  eta <- 5 + x %*% beta
+  # y <- rpois(n, exp(eta))
+  y <- rnorm(n, eta, sqrt(s2))
+  list(x = x, y = y, beta = c(s2, beta))
+}
+
+# Function to fit model: response, predictors, number of non-neg constraints
+fitlist[["nonneg_cor"]] <- list(
+  cirls = function(x, y){
+    p <- ncol(x)
+    Cmat <- cbind(0, diag(1), matrix(0, 1, p - 1))
+    # glm(y ~ x, family = "poisson", method = "cirls.fit", Cmat = Cmat, lb = 0)
+    glm(y ~ x, method = "cirls.fit", Cmat = Cmat, lb = 0)
+  },
+  glm = function(y, x){
+    # glm(y ~ x, family = "poisson")
+    glm(y ~ x)
+  }
+)
+
+# Scenarios
+sclist[["nonneg_cor"]] <- list(par = seq(-1, 1, by = .1), covar = 1, m = 1)
+
+
+#----- Data-generation mechanism 2: Poisson non-decreasing strata
+  
+# Label for this mechanism
+lablist[["survey_fish"]] <- "Non-decreasing strata"
+
+# Function to generate data: sample size, error (determines intercept), 
+#     number of strata
+dgmlist[["survey_fish"]] <- function(n, s2, int, p, par){
+  x <- factor(sample.int(p, n, replace = T))
+  strata <- par * (plogis(seq(-1, 1, length.out = p), scale = 1/s2)) + int
+  y <- rpois(n, exp(strata[x]))
+  list(x = x, y = y, beta = strata)
+}
+
+# Function to fit model: response, predictors, number of non-neg constraints
+fitlist[["survey_fish"]] <- list(
+  cirls = function(x, y){
+    p <- nlevels(x)
+    Cmat <- diff(diag(p))
+    glm(y ~ 0 + x, family = "poisson", method = "cirls.fit", Cmat = Cmat)
+  },
+  glm = function(y, x){
+    glm(y ~ 0 + x, family = "poisson")
+  }
+)
+
+# Scenarios
+sclist[["survey_fish"]] <- list(par = seq(-1, 1, by = .1), p = 5, int = 0)
+
+#----- Data-generation mechanism 3: non-decreasing strata, but Gaussian
+# 
+# # Label for this mechanism
+# lablist[["survey"]] <- "Non-decreasing strata"
+# 
+# # Function to generate data: sample size, error (determines intercept), 
+# #     number of strata
+# dgmlist[["survey"]] <- function(n, s2, int, p, par){
+#   x <- factor(sample.int(p, n, replace = T))
+#   strata <- par * (plogis(seq(-1, 1, length.out = p), scale = 1/s2)) + int
+#   y <- rnorm(n, strata[x], sqrt(s2))
+#   list(x = x, y = y, beta = strata)
+# }
+# 
+# # Function to fit model: response, predictors, number of non-neg constraints
+# fitlist[["survey"]] <- list(
+#   cirls = function(x, y){
+#     p <- nlevels(x)
+#     Cmat <- diff(diag(p))
+#     glm(y ~ 0 + x, method = "cirls.fit", Cmat = Cmat)
+#   },
+#   glm = function(y, x){
+#     glm(y ~ 0 + x)
+#   }
+# )
+# 
+# # Scenarios
+# sclist[["survey"]] <- list(par = c(-1, 0, 1), p = 5, int = 0)
+
 
 #-------------------
 # Simulate
@@ -89,85 +173,74 @@ dgmlist <- list(
 
 #----- Prepare all senarios
 
-# Data-generating scenarios
-dgmsc <- data.frame(dgm = names(dgmlist), p = c(2, 5))
-dgmsc <- cbind(dgmsc[rep(seq_along(dgmlist), c(1, length(sigmas))),], 
-  sigma = c(1, sigmas))
+# Expand scenarios, including the common parameters
+scenarios <- lapply(sclist, function(x) expand.grid(c(parlist, x)))
 
-# Full factorial design with n
-scenarios <- expand.grid(n = ns, dgm = 1:nrow(dgmsc))
-scenarios <- cbind(subset(scenarios, select = -dgm), dgmsc[scenarios$dgm,])
-nsc <- nrow(scenarios)
+# Put together
+scenarios <- bind_rows(scenarios, .id = "dgm")
+scenarios <- cbind(sc = 1:NROW(scenarios), scenarios)
 
-#----- Prepare simulations
+# Number of total scenarios
+nsc <- NROW(scenarios)
 
-# Prepare seeds, also working in parallel
-rnglist <- replicate(nsc, RNGseq(nsim, 1111), simplify = F)
+#----- Loop across scenarios and iterations
 
-# Prepare parallelisation
-ncores <- pmax(detectCores() - 2, 1)
-cl <- makeCluster(ncores)
-registerDoParallel(cl)
-writeLines(c(""), "temp/trace.txt")
+# Intialise progress
+cat("sc,i", "\n", file = "temp/trace_sim01.txt")
+
+# Plan parallelisation
+plan(multisession)
+futpars <- list(seed = 1234, packages = packages,
+  globals = c(cirlsfct, "dgmlist", "fitlist", "prog", "nsc", "nsim", "edf2", "edfboot"))
 
 # Loop across simulations
-simures <- foreach(sc = iter(scenarios, by = "row"), rngsc = rnglist,
-    .packages = packages, .combine = rbind) %:%
-  foreach(i = seq(nsim), rng = rngsc, .combine = rbind,
-    .packages = packages) %dopar%
+simures <- foreach(sc = iter(scenarios, by = "row"), .combine = rbind,
+    .options.future = futpars) %:%
+  foreach(i = icount(nsim), .combine = rbind,
+    .options.future = modifyList(futpars, list(seed = TRUE))) %dofuture%
 {
   
-  # Trace
-  if (i == 1) cat(as.character(Sys.time()), paste(sc, collapse = ", "), "\n",
-    file = "temp/trace.txt", append = T)
-  
-  # Source cirls functions
-  lapply(allfiles, source) |> invisible()
-  
-  #----- Generate data
-  
-  # Get data-generating mechanism
-  dgm <- dgmlist[[sc$dgm]]
-  
-  # Set seed
-  setRNG(rng)
-  
   # Generate this iteration of data
-  data <- dgm$datafun(sc$n, sc$p, sc$sigma)
+  dgm <- dgmlist[[sc$dgm]]
+  dgmpars <- sc[formalArgs(dgm)]
+  data <- do.call(dgm, dgmpars)
   
-  #----- Fit models
-  
-  # Fit all models
-  modfit <- lapply(dgm$modfuns, do.call, list(x = data$x, y = data$y))
-  
-  # Extracts results from models
-  results <- foreach(fit = modfit, lab = names(modfit), .combine = rbind) %do% {
+  #----- Fit models and extract results
+  modres <- lapply(fitlist[[sc$dgm]], function(f){
     
-    # Coefficients
-    coefs <- coef(fit)
+    # Fit
+    modfit <- f(x = data$x, y = data$y)
     
-    # Variances
-    vars <- diag(vcov(fit))
+    # Extract coefficients
+    coefs <- coef(modfit)
+    
+    # Extract variances
+    vars <- diag(vcov(modfit))
     
     # Confidence intervals
-    cis <- confint(fit)
+    suppressMessages(cis <- confint(modfit))
     colnames(cis) <- c("low", "high")
     
     # Degrees of freedom and AIC
-    dfs <- edf(fit)[-1]
-    aic0 <- fit$aic
-    aicE <- AIC(fit)
+    dfs <- edfboot(modfit)[-1]
+    aic0 <- logLik(modfit, df = "odf") |> AIC()
+    aicE <- logLik(modfit, df = "edf") |> AIC()
     
-    # Put everything together
-    data.frame(model = lab, coef = seq_along(coefs) - 1, true = data$beta, 
-      est = coefs, v = vars, cis, t(dfs), aic0 = aic0, aicE = aicE)
-  }
+    # Put into data.frame
+    data.frame(sim = i, sc = sc$sc, 
+      coef = seq_along(coefs) - 1, true = data$beta, 
+      est = coefs, v = vars, cis, 
+      t(dfs), aic0 = aic0, aicE = aicE)
+  })
   
-  # Add info about iteration and return
-  cbind(sc, sim = i, results)
+  # Trace
+  if ((i %% 100) == 0) cat(format(Sys.time(), "%m-%d %X"), 
+    "scenario: ", sc$sc, " - iteration ", i,  "\n",
+    file = "temp/trace_sim01.txt", append = T)
+  
+  # Tidy and return
+  bind_rows(modres, .id = "mod")
 }
-
-stopCluster(cl)
 
 # Save results
 save(simures, file = "temp/simures.RData")
