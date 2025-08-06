@@ -87,7 +87,7 @@ dgmlist[["nonneg_cor"]] <- function(n, s2, par, covar){
   eta <- 5 + x %*% beta
   # y <- rpois(n, exp(eta))
   y <- rnorm(n, eta, sqrt(s2))
-  list(x = x, y = y, beta = c(s2, beta))
+  list(x = x, y = y, beta = c(5, beta))
 }
 
 # Function to fit model: response, predictors, number of non-neg constraints
@@ -222,7 +222,10 @@ simures <- foreach(sc = iter(scenarios, by = "row"), .combine = rbind,
     colnames(cis) <- c("low", "high")
     
     # Degrees of freedom and AIC
-    dfs <- edfboot(modfit)[-1]
+    dfsim <- edf(modfit)[-1]
+    dfboot <- edfboot(modfit)[3]
+    
+    # This AIC uses the basic degrees of freedom
     aic0 <- logLik(modfit, df = "odf") |> AIC()
     aicE <- logLik(modfit, df = "edf") |> AIC()
     
@@ -230,7 +233,7 @@ simures <- foreach(sc = iter(scenarios, by = "row"), .combine = rbind,
     data.frame(sim = i, sc = sc$sc, 
       coef = seq_along(coefs) - 1, true = data$beta, 
       est = coefs, v = vars, cis, 
-      t(dfs), aic0 = aic0, aicE = aicE)
+      t(dfsim), edfboot = dfboot, aic0 = aic0, aicE = aicE)
   })
   
   # Trace
