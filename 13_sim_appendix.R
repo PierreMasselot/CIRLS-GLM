@@ -1,6 +1,7 @@
 ################################################################################
 #
-# Additional plots
+# Simulation study
+# 4. Appendices
 #
 ################################################################################
 
@@ -11,8 +12,9 @@
 
 # Coefficient labels
 coeflabs <- list(
-  nonneg_cor = c("Intercept", "Main", "Covariate"),
-  survey_fish = c(sprintf("%s strata", c("Lower", "2nd", "Middle", "4th", "Higher")))
+  nonneg = c("Intercept", "Main", "Covariate"),
+  nondecr = c(sprintf("%s strata", 
+    c("Lower", "2nd", "Middle", "4th", "Higher")))
 )
 
 #----- Compute true coefficients
@@ -24,7 +26,7 @@ truecoefs <- foreach(sc = iter(scenarios, by = "row"), .combine = rbind) %do% {
   dgmfun <- dgmlist[[sc$dgm]]
   
   # Call it with relevant parameters and extract betas
-  betas <- do.call(dgmfun, sc[names(sc) %in% formalArgs(dgmfun)])$beta
+  betas <- do.call(dgmfun$generate, sc[c("n", "s2", "par")])$true
   data.frame(sc, 
     coef = factor(coeflabs[[sc$dgm]], levels = coeflabs[[sc$dgm]]), 
     true = betas)
@@ -34,7 +36,8 @@ truecoefs <- foreach(sc = iter(scenarios, by = "row"), .combine = rbind) %do% {
 truecoefs <- subset(truecoefs, coef != "Intercept") |>
   # And tidy variables
   mutate(dgm = factor(dgm, 
-      labels = sprintf("%s) %s", letters[seq_along(unique(dgm))], lablist)))
+      labels = sprintf("%s) %s", letters[seq_along(unique(dgm))], 
+        sapply(dgmlist, "[[", "lab"))))
 
 #----- Plot
 

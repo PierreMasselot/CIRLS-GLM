@@ -9,9 +9,7 @@ library(dplyr)
 library(ggplot2)
 library(robCompositions)
 library(stringr)
-
-cirlsdir <- "../../cirls"
-devtools::load_all(cirlsdir)
+library(cirls)
 
 #-------------------
 # Data prep
@@ -64,4 +62,4 @@ ggplot(resdf) + theme_bw() +
   labs(x = "Coefficient")
 
 # Save
-ggsave("figures/app2_gdp.pdf")
+ggsave("figures/fig5_gdp.png")

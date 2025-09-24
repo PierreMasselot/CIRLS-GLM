@@ -1,6 +1,7 @@
 ################################################################################
 #
-# Simulation plots
+# Simulation study
+# 3. Plot results
 #
 ################################################################################
 
@@ -29,27 +30,19 @@ simures <- merge(simures, scenarios)
 
 # Models and data-generating mechanisms as factors for ordering
 simures <- mutate(simures, 
-  dgm = factor(dgm, levels = names(lablist), labels = unlist(lablist)),
+  dgm = factor(dgm, levels = names(dgmlist), 
+    labels = sapply(dgmlist, "[[", "lab")),
   mod = factor(mod, levels = c("cirls", "glm"), 
     labels = c("Constrained", "Unconstrained")),
   coef = factor(coef)
-  )
-
-# Select results to show
-showres <- subset(simures, n == 500 & s2 == 50 & par %in% c(-1, 0, 1) &
-    dgm %in% c("Non-negative regression", 
-      "Non-decreasing strata")) |>
-  mutate(par = factor(par, levels = c(-1, 0, 1), 
-    labels = c("Wrong", "Boundary", "Right")))
-  
+)
 
 #--------------------
 # Figure 1: Bias-variance
 #--------------------
 
 # Select data
-estres <- subset(simures, n == 500 & s2 == 50 & 
-    dgm %in% c("Non-negative regression", "Non-decreasing strata")) |>
+estres <- subset(simures, n == 500 & s2 == 50) |>
   summarise(
     bias = mean(est - true)^2, # Bias squared
     empse = sd(est), # Standard error
@@ -108,7 +101,7 @@ estplots <- imap(est_spl, function(d, i) ggplot(d) + theme_bw() +
 
 # Put together and save
 resplot <- wrap_plots(estplots, nrow = 2, guides = "collect")
-ggsave("figures/RMSEcurves.pdf", plot = resplot, width = 12, height = 10)
+ggsave("figures/Fig1_RMSE.png", plot = resplot, width = 12, height = 10)
 
 
 #--------------------
@@ -118,8 +111,7 @@ ggsave("figures/RMSEcurves.pdf", plot = resplot, width = 12, height = 10)
 #----- Compute inference mesaures
 
 # Select data
-infres <- subset(simures, n == 500 & mod == "Constrained" &
-    dgm %in% c("Non-negative regression", "Non-decreasing strata")) |>
+infres <- subset(simures, n == 500 & mod == "Constrained") |>
   summarise(
     empse = sd(est), # Standard error
     modse = sqrt(mean(v)), # Average standard deviation
@@ -189,7 +181,7 @@ coverplots <- map(inf_spl, function(d) ggplot(d) + theme_bw() +
 
 # Put together and save
 inferplot <- wrap_plots(c(seplots, coverplots), ncol = 2)
-ggsave("figures/InferenceCurves.pdf", plot = inferplot, height = 8, width = 10)
+ggsave("figures/Fig2_Infer.png", plot = inferplot, height = 8, width = 10)
 
 
 #--------------------
@@ -222,7 +214,6 @@ dfres <- subset(simures, coef == 0 & mod == "Constrained") |>
 
 #----- Plot df
 
-
 # Create plot
 dfplot <- ggplot(dfres) + theme_bw() + 
   # By DGM
@@ -238,11 +229,11 @@ dfplot <- ggplot(dfres) + theme_bw() +
   # Titles and theme
   scale_color_manual(values = dfcol, name = "",
     labels = c("edf (median + IQR)", "odf (mean)")) +
-  labs(x = "Lower bound", y = "Degrees of freedom") + 
+  labs(x = expression(Feasibility ~ gamma), y = "Degrees of freedom") + 
   theme(panel.grid.minor = element_blank(),
     strip.placement = "outside", legend.position = "bottom",
     strip.background = element_rect(fill = NA, colour = NA),
     strip.text=element_text(size = 15))
 
 # Save
-ggsave("figures/dfcurve.pdf", dfplot)
+ggsave("figures/Fig3_df.png", dfplot, width = 10)
