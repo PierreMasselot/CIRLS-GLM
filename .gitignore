@@ -49,6 +49,6 @@ po/*~
 rsconnect/
 
 # Specific
-simulations/
+#simulations/
 figures/
 temp/

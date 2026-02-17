@@ -62,4 +62,4 @@ ggplot(resdf) + theme_bw() +
   labs(x = "Coefficient")
 
 # Save
-ggsave("figures/fig5_gdp.png")
+ggsave("figures/fig5.pdf")
