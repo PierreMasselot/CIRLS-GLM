@@ -59,7 +59,13 @@ ggplot(resdf) + theme_bw() +
   facet_wrap(~ sex) + 
   geom_vline(xintercept = 0) + 
   scale_y_discrete(name = "", limits = rev) + 
-  labs(x = "Coefficient")
+  labs(x = "Coefficient") +
+  theme(legend.position.inside = c(0.15, .90), 
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 15),
+    legend.text = element_text(size = 15),
+    strip.background = element_rect(fill = NA, colour = NA),
+    strip.text = element_text(size = 17, hjust = 0))
 
 # Save
-ggsave("figures/fig5.pdf")
+ggsave("figures/Fig5.pdf", width = 11)

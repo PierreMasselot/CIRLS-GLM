@@ -130,5 +130,5 @@ ggplot(resdf, aes(x = year)) + theme_bw() +
     strip.text = element_text(size = 17, hjust = 0))
 
 # Save
-ggsave("figures/fig4.pdf", width = 11)
+ggsave("figures/Fig4.pdf", width = 11)
 
