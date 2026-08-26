@@ -1,5 +1,7 @@
 # A constrained iteratively-reweighted least-squares framework for generalised linear models
 
+[![DOI](https://zenodo.org/badge/944473173.svg)](https://doi.org/10.5281/zenodo.18746187)
+
 -----
 
 > [!WARNING] 
