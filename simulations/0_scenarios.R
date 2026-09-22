@@ -1,30 +1,10 @@
 ################################################################################
 #
 # Simulation study
-# 1. Attach packages and define simulation scenarios
+# 1. Define simulation scenarios
 #
 ################################################################################
 
-# I use the librarian package to easily attach
-library(librarian)
-
-# Define the list of needed packages
-packlist <- c(
-  # Main analysis packages
-  "cirls", "MASS", 
-  
-  # Tidyverse and other convenience packages
-  "tidyverse", "abind",
-  
-  # Packages to loop across simulations
-  "foreach", "rngtools", "doFuture", "iterators",
-  
-  # Useful packages for plotting
-  "scico", "patchwork",  "scales"
-)
-
-# Attach (or install if needed)
-librarian::shelf(packlist)
 
 ################################################################################
 # Parameters & scenarios
@@ -32,11 +12,11 @@ librarian::shelf(packlist)
 #----- General parameters
 
 # Number of simulations
-nsim <- 1000
+nsim <- 10000
 
 # Common parameters
 parlist <- list(
-  n = c(500), # Sample size
+  n = c(100, 500), # Sample size
   s2 = c(50), # Noise level
   par = seq(-1, 1, by = .1) # Feasibility parameter
 )
@@ -102,7 +82,7 @@ dgmlist[["nondecr"]] <- list(
   
   # Generate response vector
   genY = function(X, Beta, s2){
-    eta <- Beta$slopes[X] #+ log(sqrt(s2))
+    eta <- Beta$slopes[X]
     rpois(NROW(X), exp(eta))
   }, 
   

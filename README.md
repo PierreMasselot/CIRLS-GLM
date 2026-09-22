@@ -13,6 +13,6 @@ This repository stores the code and data to reproduce all results from the arXiv
 
 This manuscript introduces a full framework for generalised linear models (GLM) subject to linear constraints on the coefficients. We propose an efficient algorithm to fit the model which is a constrained version of the classical iteratively-reweighted least-squares (CIRLS). We also propose an inference procedure for estimated constrained coefficients, as well as formulas for degrees of freedom.
 
-This repository performs the full simulation study and the two case studies in the manuscript. 
+This repository performs the full simulation study and the case study in the manuscript. 
 
-The methods proposed in this manuscript are implemented in the R package [`cirls`](https://cran.r-project.org/web/packages/cirls/index.html). Although stable and already available on CRAN, the package is still under development. This repo works with recent updates from the [`cirls` GitHub repo](https://github.com/PierreMasselot/cirls). The exact version of the package used to produce the last results can be installed using the `renv::restore()` command prior to running the code. 
+The methods proposed in this manuscript are implemented in the R package [`cirls`](https://cran.r-project.org/web/packages/cirls/index.html). Although stable and already available on CRAN, the package is still under development. This repo works with recent updates from the [`cirls` GitHub repo](https://github.com/PierreMasselot/cirls). The exact version of the package used to produce the last results is found in the `packageVersion.txt` file. 

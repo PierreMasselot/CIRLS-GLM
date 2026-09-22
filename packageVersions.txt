@@ -1,0 +1,14 @@
+cirls: 0.4.0.11
+MASS: 7.3.66
+dlnm: 2.4.10
+tsModel: 0.6.2
+splines: 4.6.1
+tidyverse: 2.0.0
+abind: 1.4.8
+foreach: 1.5.2
+rngtools: 1.5.2
+doFuture: 1.3.0
+iterators: 1.0.14
+scico: 1.5.0
+patchwork: 1.3.2
+scales: 1.4.0

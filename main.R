@@ -5,45 +5,51 @@
 ################################################################################
 
 #-----------------------
-# renv
+# Package management
 #-----------------------
 
-# Uses renv to store information about package environment used
+# Managed with pacman
+library(pacman)
 
-# To use exactly the right packages, run the following command
-renv::restore()
+# Potentially update packages
+# p_update()
+
+# Load all packages
+source("packages.R")
+
+# Save version
+ver <- sapply(c("cirls", packlist), \(x){
+  sprintf("%s: %s", x, paste(p_version(x), collapse = "."))
+})
+writeLines(ver, "packageVersions.txt")
 
 #-----------------------
 # Simulations
 #-----------------------
 
-# Define scenarios
+# Define scenarios and simulate: writes results
 source("simulations/0_scenarios.R")
-
-# Run simulations - long code, can be traced in simulations/trace.txt
 source("simulations/1_simulate.R")
 
-# Create plots - saved in figures/
+# Produce plots: select scenario
+nsel <- 500
 source("simulations/2_plots.R")
-
-# Create the appendix plots
 source("simulations/3_appendix.R")
+
 
 #-----------------------
 # Case studies
 #-----------------------
 
-# First case study: global warming
-rm(list = ls())
-source("case studies/1_warming.R")
+# Get the list of applications
+appdir <- "case studies"
+appscripts <- list.files(appdir, pattern = ".R$")
 
-# Second: life expectancy
-rm(list = ls())
-source("case studies/2_lifexp.R")
+# Go through it
+for (x in appscripts){
+  rm(list = setdiff(ls(), c("appscripts", "appdir", "x")))
+  print(x)
+  source(paste0(appdir, "/", x))
+}
 
-#-----------------------
-# renv
-#-----------------------
 
-# Take a snapshot of the current library (if everything works)
-renv::snapshot()

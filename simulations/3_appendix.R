@@ -61,16 +61,30 @@ ggplot(truecoefs) + theme_bw() +
     strip.text=element_text(size = 15))
 
 # Save
-ggsave("figures/app_genCoefs.pdf", width = 10)
+ggsave("figures/FigA1.pdf", width = 10)
 
 
 #--------------------
 # Bias-eliminated coverage
 #--------------------
 
-# Select the performance measures and only cirls
-beres <- select(perfres, !all_of(names(unlist(measlabs[-3])))) |>
-  subset(model == "cirls")
+#----- Select data
+
+# Select the value of n and which Figure it will be
+nsel <- 500
+
+# Create a data.frame for plotting
+beres <- coefres |>
+  
+  # Select coefficients and scenarios
+  subset(!coef %in% c("(Intercept)", "Strata 2", "Strata 4") & 
+      n == nsel & model == "cirls") |>
+
+  # Select performance measures
+  select(model, coef, dgm, par, all_of(names(measlabs[[3]]))) |>
+  
+  # Transform some criteria for easier plotting
+  mutate(becover = 100 * becover)
 
 #----- Create plot of Bias-eliminated coverage
 
@@ -79,7 +93,7 @@ ggplot(beres) + theme_bw() +
   facet_wrap(vars(dgm)) +
 
   # Main delimitations of the plot with labels
-  geom_hline(yintercept = .95) +
+  geom_hline(yintercept = 95) +
   geom_vline(xintercept = 0, linetype = 2) +
   
   # Add lines and points
@@ -87,9 +101,9 @@ ggplot(beres) + theme_bw() +
   geom_point(aes(x = par, y = becover, col = coef, group = coef)) +
   
   # Feasibility labels
-  geom_label(x = 0.1, y = 0, label = "Feasible", hjust = 0, 
+  geom_label(x = 0.1, y = 0, label = feaslabs[1], hjust = 0, 
     linewidth = 0, label.padding = unit(0, "mm")) +
-  geom_label(x = -0.1, y = 0, label = "Unfeasible", hjust = 1, 
+  geom_label(x = -0.1, y = 0, label = feaslabs[2], hjust = 1, 
     linewidth = 0, label.padding = unit(0, "mm")) +
   
   # Scales
@@ -104,7 +118,7 @@ ggplot(beres) + theme_bw() +
     legend.position = "bottom")
 
 # Save
-ggsave("figures/app_BEcoverage.pdf", height = 5, width = 10)
+ggsave("figures/FigA2.pdf", height = 5, width = 10)
 
 
 #--------------------
@@ -114,24 +128,24 @@ ggsave("figures/app_BEcoverage.pdf", height = 5, width = 10)
 #----- Data wrangling
 
 # Labels
-dflabs <- c(dfbias = "Bias", dfse = "Standard error")
+dflabs <- c(bias = "Bias", se = "Standard error")
 
 # Pivot performance criteria (removing mse)
-dfres2 <- select(dfres, !dfmse) |>
+dfperf2 <- select(dfperf, df, bias, se, par, dgm) |>
   pivot_longer(cols = names(dflabs), names_to = "measure") |>
   mutate(measure = factor(measure, names(dflabs), dflabs))
 
 # Prepare labels for feasibility
-ytxt <- subset(dfres2, measure == measure[1]) |>
+ytxt <- subset(dfperf2, measure == measure[1]) |>
   summarise(y = max(value), .by = dgm)
 xtxt <- data.frame(txt = c("Feasible", "Unfeasible"), x = c(0.1, -0.1),
-  hjust = c(0, 1), measure = dfres2$measure[1])
+  hjust = c(0, 1), measure = dfperf2$measure[1])
 feasdf <- cbind(xtxt[rep(1:2, 2),], ytxt[rep(1:2, each = 2),])
 
 #----- Plot
 
 # Plot outline
-plout <- ggplot(dfres2) + theme_bw() + 
+plout <- ggplot(dfperf2) + theme_bw() + 
   facet_grid(rows = vars(measure), scales = "free", switch = "y") +
 
   # Main delimitations of the plot with labels
@@ -160,9 +174,9 @@ dgmplots <- lapply(dgmlabs, function(lb){
       data = subset(feasdf, dgm == lb)) +
     
     # Add lines and points to plot by selecting data
-    geom_line(aes(x = par, y = value, col = type, group = type),
+    geom_line(aes(x = par, y = value, col = df, group = df),
       data = ~ subset(.x, dgm == lb)) +
-    geom_point(aes(x = par, y = value, col = type, group = type),
+    geom_point(aes(x = par, y = value, col = df, group = df),
       data = ~ subset(.x, dgm == lb)) +
     
     # And the title
@@ -173,4 +187,4 @@ dgmplots <- lapply(dgmlabs, function(lb){
 wrap_plots(dgmplots, nrow = 1)
 
 # Save
-ggsave("figures/app_dfres.pdf", height = 6, width = 8)
+ggsave("figures/FigA3.pdf", height = 5, width = 10)

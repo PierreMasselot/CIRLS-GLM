@@ -19,9 +19,16 @@ plan(multisession)
 futpars <- list(seed = 1234, packages = packlist)
 
 # Loop 
-simures <- foreach(sc = iter(scenarios, by = "row"), 
-  .options.future = futpars) %dofuture%
+simures <- foreach(sc = iter(scenarios, by = "row"),
+  .errorhandling = "pass", .options.future = futpars) %dofuture%
 {
+  
+  # Let's add a time limit so that it fails after some time
+  setTimeLimit(elapsed = 10000)
+  on.exit(setTimeLimit(elapsed = Inf), add = TRUE)
+  
+  # Get the current state of RNG
+  rngstate <- .Random.seed
   
   #--------------------
   # Generate data
@@ -50,77 +57,140 @@ simures <- foreach(sc = iter(scenarios, by = "row"),
   # Go through models to fit
   modres <- lapply(modfuns, function(f){
     
-    # Fit on all generated y vectors
-    simfit <- apply(Y, 2, function(y) do.call(dgmlist[[sc$dgm]][[f]], 
-      list(y = y, X = X)))
+    # cnt <- 0
     
-    #----- Estimation performances
+    #----- Fit and extract results for all generated y vectors
+    simfit <- apply(Y, 2, simplify = F, FUN = function(y){
+      
+      # cat(cnt <<- cnt + 1, "")
+      
+      # Fit model
+      fit <- do.call(dgmlist[[sc$dgm]][[f]], list(y = y, X = X))
+      
+      # Coefficients
+      coefs <- coef(fit)
+      
+      # Change depending on the type of model
+      if (inherits(fit, "cirls")){
+        
+        # Simulate first and then compute 
+        sims <- simulCoef(fit, nsim = 10000)
+        v <- diag(vcov(sims))
+        ci <- confint(sims)
+      } else {
+        
+        # Use usual methods (tryCatch is because profiling can fail)
+        v <- diag(vcov(fit))
+        ci <- tryCatch(suppressMessages(confint(fit)), 
+          error = function(e) matrix(NA, length(coefs), 2))
+        colnames(ci) <- c("low", "high")
+      }
+      
+      # Expected degrees of freedom
+      dfs <- edf(fit)[-1]
+      
+      # Predictions (to compute true complexity)
+      yhat <- predict(fit)
+      
+      # Return everything
+      list(fit = fit, coefs = coefs, v = v, ci = ci, dfs = dfs, yhat = yhat)
+    })
+    
+    # Initialise performance results
+    coefres <- data.frame(coef = seq_along(simfit[[1]]$coef), 
+      true = betavec)
+    
+    #----- Estimation of performances
     
     # Extract coefficients
-    coefs <- sapply(simfit, coef)
+    coefs <- sapply(simfit, "[[", "coefs")
     
-    # Bias
-    meanest <- rowMeans(coefs)
-    bias <- meanest - betavec
-    
-    # Standard error
-    empse <- apply(coefs, 1, sd)
-    
-    # MSE
-    mse <- rowMeans((coefs - betavec)^2)
-    
+    # Compute error measures: bias, SE and MSE
+    coefres <- mutate(coefres, 
+      meanest = rowMeans(coefs, na.rm = T),
+      bias = meanest - betavec,
+      empse = apply(coefs, 1, sd, na.rm = T),
+      mse = rowMeans((coefs - betavec)^2, na.rm = T)
+    )
+
     #----- Precision performances
     
-    # Extract variances and compute variance error
-    vars <- sapply(simfit, function(x) diag(vcov(x)))
-    modse <- sqrt(rowMeans(vars))
-    seerr <- 100 * ((modse / empse) - 1)
+    # Extract variances
+    vars <- sapply(simfit, "[[", "v")
     
-    # Confidence intervals and coverage
-    cis <- suppressMessages(lapply(simfit, confint) |> abind(along = 3))
-    cover <- rowMeans(apply(cis, 3, function(x) between(betavec, x[,1], x[,2])))
-    becover <- rowMeans(apply(cis, 3, 
-      function(x) between(meanest, x[,1], x[,2])))
+    # Extract whether CIs cover coefficients
+    incl <- sapply(simfit, \(x) between(betavec, x$ci[,1], x$ci[,2]))
+    inclmean <- sapply(simfit, 
+      \(x) between(coefres$meanest, x$ci[,1], x$ci[,2]))
+    
+    # Compute performances: se error, coverage and bias-corrected coverage
+    coefres <- mutate(coefres,
+      modse = sqrt(rowMeans(vars, na.rm = T)),
+      seerr = 100 * ((modse / empse) - 1),
+      cover = rowMeans(incl, na.rm = T),
+      becover = rowMeans(inclmean, na.rm = T)
+    )
     
     #----- Degrees of freedom
     
     # Get dispersion
-    disp <- simfit[[1]]$family$dispersion
+    disp <- simfit[[1]]$fit$family$dispersion
     
     # Estimated degrees of freedom
-    dfs <- sapply(simfit, edf)[-1,]
-    dfmean <- rowMeans(dfs) - is.na(disp)
-    # dfsum <- apply(dfs, 1, quantile, probs = c(0, .25, .5, .75, 1), na.rm = T)
+    dfs <- sapply(simfit, "[[", "dfs")
     
     # "True" degrees of freedom
-    yhat <- sapply(simfit, predict)
+    yhat <- sapply(simfit, "[[", "yhat")
     den <- ifelse(is.na(disp), sc$s2, disp)
     truedf <- sum(diag(cov(t(Y), t(yhat)))) / den
     
-    # Error in degrees of freedom
-    dfbias <- dfmean - truedf
-    dfse <- apply(dfs, 1, sd)
-    dfmse <- rowMeans((dfs - truedf)^2)
+    # Initialise data.frame to store df results
+    dfres <- data.frame(df = c("o", "e"),
+      true = truedf,
+      mean = rowMeans(dfs) - is.na(disp)
+    )
     
-    #----- Return everything
-    list(bias = bias, empse = empse, mse = mse, 
-      seerr = seerr, cover = cover, becover = becover,
-      dfmean = dfmean, truedf = truedf, 
-      dfbias = dfbias, dfse = dfse, dfmse = dfmse)
+    # Compute performance results
+    dfres <- mutate(dfres,
+      bias = mean - true,
+      se = apply(dfs, 1, sd, na.rm = T),
+      mse = rowMeans((dfs - truedf)^2, na.rm = T)
+    )
+    
+    #----- Return both data.frames
+    list(coefs = coefres, dfs = dfres)
   })
   
-  
   #----- Put together and return
+  
+  # Right labels
+  names(modres) <- modlabs
+  
+  # Bind data.frames
+  boundres <- list_transpose(modres) |> lapply(bind_rows, .id = "model") |>
+    lapply(remove_rownames)
   
   # Trace
   cat("Completed scenario", sc$sc, "-", format(Sys.time(), "%Y-%m-%d %X"), "\n",
     file = "simulations/trace.txt", append = T)
   
   # Return
-  sc$lab <- dgmlist[[sc$dgm]]$lab
-  names(modres) <- modlabs
-  c(list(sc = sc), modres)
+  c(list(sc = sc, rngstate = as.data.frame(t(rngstate))), boundres)
 }
 
-# Save results
+#----- Save everything
+
 save(simures, file = "simulations/results.RData")
+
+# Prepare results folder
+respath <- "simulations/results"
+unlink(respath, recursive = TRUE)
+dir.create(respath, recursive = T)
+
+# Loop through elements to save in csvs
+
+list_transpose(simures) |> 
+  imap(\(res, lab) bind_rows(res, .id = "sc") |> 
+      write.csv(file = sprintf("%s/%s.csv", respath, lab), 
+      row.names = F, quote = F))
+
