@@ -8,14 +8,11 @@
 # Package management
 #-----------------------
 
-# Managed with pacman
-library(pacman)
+# Load all packages
+source("packages.R")
 
 # Potentially update packages
 # p_update()
-
-# Load all packages
-source("packages.R")
 
 # Save version
 ver <- sapply(c("cirls", packlist), \(x){
@@ -41,15 +38,7 @@ source("simulations/3_appendix.R")
 # Case studies
 #-----------------------
 
-# Get the list of applications
-appdir <- "case studies"
-appscripts <- list.files(appdir, pattern = ".R$")
-
-# Go through it
-for (x in appscripts){
-  rm(list = setdiff(ls(), c("appscripts", "appdir", "x")))
-  print(x)
-  source(paste0(appdir, "/", x))
-}
+# Case study of temperature
+source("case studies/1_temperature.R")
 
 

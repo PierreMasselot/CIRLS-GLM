@@ -6,8 +6,12 @@
 ################################################################################
 
 # Get scenarios and reload packages (if new session)
-source("simulations/0_scenarios.R")
-pacman::p_load(packlist, character.only = TRUE)
+if (!"packlist" %in% ls()){
+  source("simulations/0_scenarios.R")
+  
+  # Also select scenario for sample size
+  nsel <- 500
+}
 
 #--------------------
 # Parameters

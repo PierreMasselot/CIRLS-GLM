@@ -4,6 +4,8 @@
 #
 ################################################################################
 
+library(pacman)
+
 # At the moment, use the development version in GitHub
 pacman::p_load_gh("PierreMasselot/cirls")
 

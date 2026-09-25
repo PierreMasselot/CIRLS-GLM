@@ -5,7 +5,7 @@
 -----
 
 > [!WARNING] 
-> This work is has not yet been peer-reviewed and is expected to change in the future.
+> This work is undergoing peer-reviewing and is expected to change in the future.
 
 This repository stores the code and data to reproduce all results from the arXiv preprint
 
